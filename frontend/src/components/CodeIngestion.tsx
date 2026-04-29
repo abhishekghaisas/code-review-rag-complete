@@ -35,7 +35,7 @@ function CodeIngestion({ onIngestionComplete }: CodeIngestionProps) {
 
     try {
       const chunkId = `manual_${Date.now()}`;
-      const response = await api.post('/api/ingest', {
+      const response = await api.post('/api/ingest/repo', {
         code_chunks: [
           {
             id: chunkId,
