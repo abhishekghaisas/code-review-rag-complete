@@ -1,18 +1,9 @@
 """
 Basic tests for Code Review RAG backend
-Run with: pytest tests/ -v
 """
-
-import sys
-import os
-
-# Add parent directory to path so we can import app
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest
 from fastapi.testclient import TestClient
-
-# Now we can import app
 from app.main import app
 
 client = TestClient(app)
@@ -25,6 +16,7 @@ def test_health_check():
     data = response.json()
     assert "status" in data
     assert "version" in data
+    print("✅ Health check passed")
 
 
 def test_root_endpoint():
@@ -34,6 +26,7 @@ def test_root_endpoint():
     data = response.json()
     assert "message" in data
     assert "endpoints" in data
+    print("✅ Root endpoint passed")
 
 
 def test_get_models():
@@ -44,11 +37,11 @@ def test_get_models():
     assert "models" in data
     assert len(data["models"]) > 0
     
-    # Check model structure
     first_model = data["models"][0]
     assert "id" in first_model
     assert "name" in first_model
     assert "cost" in first_model
+    print(f"✅ Models endpoint passed - found {len(data['models'])} models")
 
 
 def test_get_stats():
@@ -60,6 +53,7 @@ def test_get_stats():
     assert "total_chunks" in data
     assert "embedding_model" in data
     assert "embedding_dimension" in data
+    print(f"✅ Stats endpoint passed - {data['total_chunks']} chunks")
 
 
 def test_ingest_code():
@@ -69,12 +63,12 @@ def test_ingest_code():
         json={
             "code_chunks": [
                 {
-                    "id": "test_chunk_ci",
-                    "code": "def test():\n    pass",
+                    "id": "test_ci_chunk",
+                    "code": "def ci_test():\n    return True",
                     "language": "python",
                     "metadata": {
-                        "file_path": "test.py",
-                        "source": "ci_test"
+                        "file_path": "ci_test.py",
+                        "source": "ci"
                     }
                 }
             ]
@@ -84,6 +78,7 @@ def test_ingest_code():
     data = response.json()
     assert data["status"] == "success"
     assert data["chunks_ingested"] == 1
+    print("✅ Code ingestion passed")
 
 
 def test_list_reviews():
@@ -94,6 +89,7 @@ def test_list_reviews():
     assert "reviews" in data
     assert "total" in data
     assert isinstance(data["reviews"], list)
+    print(f"✅ Reviews listing passed - {data['total']} reviews")
 
 
 def test_get_ingestion_jobs():
@@ -103,7 +99,4 @@ def test_get_ingestion_jobs():
     data = response.json()
     assert "jobs" in data
     assert isinstance(data["jobs"], list)
-
-
-# Note: We skip testing actual code review in CI unless API key is provided
-# This prevents failures when running in CI without secrets
+    print(f"✅ Ingestion jobs passed - {data['total']} jobs")
