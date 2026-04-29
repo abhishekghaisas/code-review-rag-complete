@@ -104,8 +104,11 @@ class CodeReviewRAG:
     ) -> dict:
         """Generate code review using Claude API"""
         
-        # Build context from RAG if enabled
+        # Initialize variables
         context = ""
+        relevant_chunks = []  # Initialize here to avoid scope issues
+        
+        # Build context from RAG if enabled
         if use_rag and self.code_chunks:
             relevant_chunks = self.retrieve_relevant_code(code, top_k=3)
             if relevant_chunks:
@@ -150,7 +153,7 @@ Provide a thorough, constructive review."""
                 "language": language,
                 "rag_enabled": use_rag,
                 "context_used": bool(context),
-                "chunks_retrieved": len(relevant_chunks) if use_rag else 0
+                "chunks_retrieved": len(relevant_chunks)
             }
         
         except Exception as e:
