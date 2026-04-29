@@ -76,10 +76,33 @@ function CodeIngestion({ onIngestionComplete }: CodeIngestionProps) {
         repo_url: githubUrl,
       });
 
-      setResult(response.data);
+      // Validate response data
+      const data = response.data;
+      
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response from server');
+      }
+
+      // Check if backend returned an error status
+      if (data.status === 'error') {
+        throw new Error(data.message || 'Repository ingestion failed');
+      }
+
+      setResult(data);
       setGithubUrl('');
+      onIngestionComplete();
+      
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to ingest repository');
+      console.error('GitHub ingestion error:', err);
+      
+      // Extract error message safely - prevent object rendering in React
+      const errorMessage = 
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to ingest repository';
+      
+      setError(String(errorMessage)); // Always convert to string
     } finally {
       setLoading(false);
     }
