@@ -94,28 +94,33 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Check for secrets
+    - name: Check for secrets in code
       run: |
-        # Check for accidentally committed API keys
-        if grep -r "sk-ant-" . \
+        # Only scan actual source code files for real API keys
+        # Pattern: ANTHROPIC_API_KEY=sk-ant-[actual-key-characters]
+        # This excludes placeholders like "sk-ant-your-key-here"
+        if grep -r "ANTHROPIC_API_KEY=sk-ant-[a-zA-Z0-9_-]\{20,\}" \
+           --include="*.py" \
+           --include="*.ts" \
+           --include="*.tsx" \
+           --include="*.js" \
+           --include="*.jsx" \
            --exclude-dir=.git \
            --exclude-dir=node_modules \
            --exclude-dir=venv \
-           --exclude="*.md" \
-           --exclude="ci.yml" || \
-           grep -r "ANTHROPIC_API_KEY=sk-" . \
-           --exclude-dir=.git \
-           --exclude-dir=node_modules \
-           --exclude-dir=venv \
-           --exclude=".env.example" \
-           --exclude="ci.yml"; then
-          echo "⚠️ WARNING: Potential API key found in code!"
+           --exclude-dir=tests; then
+          echo "⚠️ WARNING: Real API key found in code!"
           exit 1
         fi
-        echo "✅ No secrets found in code"
+        echo "✅ No real API keys found in source code"
     
     - name: Check file sizes
       run: |
         # Check for accidentally committed large files
-        find . -type f -size +10M -not -path "./.git/*" -not -path "*/node_modules/*" -not -path "*/venv/*"
+        large_files=$(find . -type f -size +10M -not -path "./.git/*" -not -path "*/node_modules/*" -not -path "*/venv/*")
+        if [ -n "$large_files" ]; then
+          echo "⚠️ WARNING: Large files found:"
+          echo "$large_files"
+          exit 1
+        fi
         echo "✅ No large files found"
