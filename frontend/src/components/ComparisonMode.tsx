@@ -55,7 +55,6 @@ function ComparisonMode({ code, language, models, useRag }: ComparisonModeProps)
 
     setResults(initialResults);
 
-    // Run reviews in parallel
     const promises = selectedModels.map(async (modelId, index) => {
       try {
         const result = await reviewCode({
@@ -94,7 +93,6 @@ function ComparisonMode({ code, language, models, useRag }: ComparisonModeProps)
 
   return (
     <div className="space-y-6">
-      {/* Model Selection */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide flex items-center gap-2">
@@ -153,7 +151,6 @@ function ComparisonMode({ code, language, models, useRag }: ComparisonModeProps)
         </button>
       </div>
 
-      {/* Comparison Results */}
       {results.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {results.map((result, index) => (
@@ -181,32 +178,20 @@ function ComparisonMode({ code, language, models, useRag }: ComparisonModeProps)
                   <div className="prose prose-invert prose-sm max-w-none">
                     <ReactMarkdown
                       components={{
-                        h2: ({ children }: { children: React.ReactNode }) => (
-                          <h2 className="text-base font-semibold text-zinc-200 mb-2 mt-4">{children}</h2>
-                        ),
-                        h3: ({ children }: { children: React.ReactNode }) => (
-                          <h3 className="text-sm font-medium text-zinc-300 mb-2 mt-3">{children}</h3>
-                        ),
-                        p: ({ children }: { children: React.ReactNode }) => (
-                          <p className="text-zinc-400 mb-2 text-xs leading-relaxed">{children}</p>
-                        ),
-                        ul: ({ children }: { children: React.ReactNode }) => (
-                          <ul className="list-disc list-inside space-y-1 text-zinc-400 mb-3 text-xs">{children}</ul>
-                        ),
-                        code: ({ children, className }: { children: React.ReactNode; className?: string }) => {
-                          const isBlock = className?.includes('language-');
+                        h2: (props) => <h2 className="text-base font-semibold text-zinc-200 mb-2 mt-4" {...props} />,
+                        h3: (props) => <h3 className="text-sm font-medium text-zinc-300 mb-2 mt-3" {...props} />,
+                        p: (props) => <p className="text-zinc-400 mb-2 text-xs leading-relaxed" {...props} />,
+                        ul: (props) => <ul className="list-disc list-inside space-y-1 text-zinc-400 mb-3 text-xs" {...props} />,
+                        code: (props) => {
+                          const isBlock = props.className?.includes('language-');
                           if (isBlock) {
                             return (
                               <pre className="bg-zinc-950 border border-zinc-800 rounded p-3 overflow-x-auto my-3">
-                                <code className="text-xs text-zinc-300 font-mono">{children}</code>
+                                <code className="text-xs text-zinc-300 font-mono" {...props} />
                               </pre>
                             );
                           }
-                          return (
-                            <code className="bg-zinc-800 px-1 py-0.5 rounded text-xs text-violet-400 font-mono">
-                              {children}
-                            </code>
-                          );
+                          return <code className="bg-zinc-800 px-1 py-0.5 rounded text-xs text-violet-400 font-mono" {...props} />;
                         },
                       }}
                     >

@@ -41,7 +41,6 @@ function ReviewPanel({ review, loading }: ReviewPanelProps) {
 
   return (
     <div className="space-y-6">
-      {/* Review Content */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
@@ -55,42 +54,24 @@ function ReviewPanel({ review, loading }: ReviewPanelProps) {
           <div className="prose prose-invert prose-sm max-w-none">
             <ReactMarkdown
               components={{
-                h1: ({ children }: { children: React.ReactNode }) => (
-                  <h1 className="text-xl font-bold text-zinc-100 mb-4">{children}</h1>
-                ),
-                h2: ({ children }: { children: React.ReactNode }) => (
-                  <h2 className="text-lg font-semibold text-zinc-200 mb-3 mt-6">{children}</h2>
-                ),
-                h3: ({ children }: { children: React.ReactNode }) => (
-                  <h3 className="text-base font-medium text-zinc-300 mb-2 mt-4">{children}</h3>
-                ),
-                p: ({ children }: { children: React.ReactNode }) => (
-                  <p className="text-zinc-400 mb-3 leading-relaxed">{children}</p>
-                ),
-                ul: ({ children }: { children: React.ReactNode }) => (
-                  <ul className="list-disc list-inside space-y-2 text-zinc-400 mb-4">{children}</ul>
-                ),
-                ol: ({ children }: { children: React.ReactNode }) => (
-                  <ol className="list-decimal list-inside space-y-2 text-zinc-400 mb-4">{children}</ol>
-                ),
-                code: ({ children, className }: { children: React.ReactNode; className?: string }) => {
-                  const isBlock = className?.includes('language-');
+                h1: (props) => <h1 className="text-xl font-bold text-zinc-100 mb-4" {...props} />,
+                h2: (props) => <h2 className="text-lg font-semibold text-zinc-200 mb-3 mt-6" {...props} />,
+                h3: (props) => <h3 className="text-base font-medium text-zinc-300 mb-2 mt-4" {...props} />,
+                p: (props) => <p className="text-zinc-400 mb-3 leading-relaxed" {...props} />,
+                ul: (props) => <ul className="list-disc list-inside space-y-2 text-zinc-400 mb-4" {...props} />,
+                ol: (props) => <ol className="list-decimal list-inside space-y-2 text-zinc-400 mb-4" {...props} />,
+                code: (props) => {
+                  const isBlock = props.className?.includes('language-');
                   if (isBlock) {
                     return (
                       <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 overflow-x-auto my-4">
-                        <code className="text-sm text-zinc-300 font-mono">{children}</code>
+                        <code className="text-sm text-zinc-300 font-mono" {...props} />
                       </pre>
                     );
                   }
-                  return (
-                    <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-sm text-violet-400 font-mono">
-                      {children}
-                    </code>
-                  );
+                  return <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-sm text-violet-400 font-mono" {...props} />;
                 },
-                strong: ({ children }: { children: React.ReactNode }) => (
-                  <strong className="text-zinc-200 font-semibold">{children}</strong>
-                ),
+                strong: (props) => <strong className="text-zinc-200 font-semibold" {...props} />,
               }}
             >
               {review.review}
@@ -99,7 +80,6 @@ function ReviewPanel({ review, loading }: ReviewPanelProps) {
         </div>
       </div>
 
-      {/* Similar Code */}
       {review.similar_code && review.similar_code.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-zinc-800">
@@ -128,7 +108,6 @@ function ReviewPanel({ review, loading }: ReviewPanelProps) {
         </div>
       )}
 
-      {/* RAG Info */}
       {review.rag_enabled && (
         <div className="flex items-center gap-2 text-xs text-zinc-500">
           <div className={`w-2 h-2 rounded-full ${review.context_used ? 'bg-green-500' : 'bg-yellow-500'}`} />
