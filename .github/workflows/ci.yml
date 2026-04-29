@@ -97,8 +97,18 @@ jobs:
     - name: Check for secrets
       run: |
         # Check for accidentally committed API keys
-        if grep -r "sk-ant-" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=venv --exclude="*.md" || \
-           grep -r "ANTHROPIC_API_KEY=sk-" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=venv --exclude=".env.example"; then
+        if grep -r "sk-ant-" . \
+           --exclude-dir=.git \
+           --exclude-dir=node_modules \
+           --exclude-dir=venv \
+           --exclude="*.md" \
+           --exclude="ci.yml" || \
+           grep -r "ANTHROPIC_API_KEY=sk-" . \
+           --exclude-dir=.git \
+           --exclude-dir=node_modules \
+           --exclude-dir=venv \
+           --exclude=".env.example" \
+           --exclude="ci.yml"; then
           echo "⚠️ WARNING: Potential API key found in code!"
           exit 1
         fi
