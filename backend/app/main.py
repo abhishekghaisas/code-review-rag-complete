@@ -115,22 +115,51 @@ async def review_code_endpoint(request: ReviewRequest):
 
 
 @app.post("/api/ingest")
-async def ingest_code_endpoint(code_chunks: list):
-    """Ingest code chunks"""
+async def ingest_code_endpoint(request: dict):
+    """Ingest code chunks OR GitHub repository"""
     try:
-        logger.info(f"Ingesting {len(code_chunks)} chunks")
+        # Handle GitHub repository URL
+        if "repo_url" in request:
+            repo_url = request["repo_url"]
+            logger.info(f"Ingesting repository: {repo_url}")
+            
+            code_files = github_ingestion.ingest_repository(repo_url)
+            
+            for file in code_files:
+                rag_engine.ingest_code(
+                    code=file["code"],
+                    filename=file["filename"],
+                    language=file["language"]
+                )
+            
+            return {
+                "status": "success",
+                "files_processed": len(code_files),
+                "message": f"✅ Ingested {len(code_files)} files from repository"
+            }
         
-        for chunk in code_chunks:
-            rag_engine.ingest_code(
-                code=chunk.get("code", ""),
-                filename=chunk.get("filename", "unknown"),
-                language=chunk.get("language", "python")
+        # Handle code chunks
+        elif "code_chunks" in request:
+            code_chunks = request["code_chunks"]
+            logger.info(f"Ingesting {len(code_chunks)} chunks")
+            
+            for chunk in code_chunks:
+                rag_engine.ingest_code(
+                    code=chunk.get("code", ""),
+                    filename=chunk.get("filename", "unknown"),
+                    language=chunk.get("language", "python")
+                )
+            
+            return {
+                "status": "success",
+                "chunks_ingested": len(code_chunks)
+            }
+        
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either 'repo_url' or 'code_chunks' required"
             )
-        
-        return {
-            "status": "success",
-            "chunks_ingested": len(code_chunks)
-        }
         
     except Exception as e:
         logger.error(f"Ingest error: {str(e)}")
