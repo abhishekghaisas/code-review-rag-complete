@@ -2,6 +2,7 @@
 
 An AI-powered code review system using Retrieval-Augmented Generation (RAG) with Anthropic Claude and vector search.
 
+[![CI](https://github.com/abhishekghaisas/code-review-rag-complete/actions/workflows/ci.yml/badge.svg)](https://github.com/abhishekghaisas/code-review-rag-complete/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
