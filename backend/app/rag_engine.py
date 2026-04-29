@@ -137,7 +137,12 @@ Provide a thorough, constructive review."""
 
         try:
             # Call Claude API
-            review_text = await self.claude_client.generate_review(prompt, model)
+            review_text = await self.claude_client.review_code(
+                code=code,
+                context=context if context else "",
+                language=language,
+                model=model
+            )
             
             return {
                 "review": review_text,

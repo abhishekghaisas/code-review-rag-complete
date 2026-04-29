@@ -70,7 +70,7 @@ class ClaudeClient:
         self.client = anthropic.Anthropic(api_key=self.api_key)
         logger.info("Claude client initialized successfully")
     
-    def review_code(
+    async def review_code(
         self,
         code: str,
         context: str = "",
