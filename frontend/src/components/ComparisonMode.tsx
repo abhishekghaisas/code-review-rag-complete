@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GitCompare, Loader2, Sparkles } from 'lucide-react';
+import { GitCompare, Loader2 } from 'lucide-react';
 import { reviewCode, type Model, type ReviewResponse } from '../api';
 import ReactMarkdown from 'react-markdown';
 
@@ -181,19 +181,19 @@ function ComparisonMode({ code, language, models, useRag }: ComparisonModeProps)
                   <div className="prose prose-invert prose-sm max-w-none">
                     <ReactMarkdown
                       components={{
-                        h2: ({ children }) => (
+                        h2: ({ children }: { children: React.ReactNode }) => (
                           <h2 className="text-base font-semibold text-zinc-200 mb-2 mt-4">{children}</h2>
                         ),
-                        h3: ({ children }) => (
+                        h3: ({ children }: { children: React.ReactNode }) => (
                           <h3 className="text-sm font-medium text-zinc-300 mb-2 mt-3">{children}</h3>
                         ),
-                        p: ({ children }) => (
+                        p: ({ children }: { children: React.ReactNode }) => (
                           <p className="text-zinc-400 mb-2 text-xs leading-relaxed">{children}</p>
                         ),
-                        ul: ({ children }) => (
+                        ul: ({ children }: { children: React.ReactNode }) => (
                           <ul className="list-disc list-inside space-y-1 text-zinc-400 mb-3 text-xs">{children}</ul>
                         ),
-                        code: ({ children, className }) => {
+                        code: ({ children, className }: { children: React.ReactNode; className?: string }) => {
                           const isBlock = className?.includes('language-');
                           if (isBlock) {
                             return (

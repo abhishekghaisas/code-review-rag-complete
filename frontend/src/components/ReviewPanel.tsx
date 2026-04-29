@@ -1,5 +1,5 @@
 import { type ReviewResponse } from '../api';
-import { Bug, Zap, Sparkles, Lightbulb, Code, FileCode } from 'lucide-react';
+import { Sparkles, FileCode } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface ReviewPanelProps {
@@ -55,25 +55,25 @@ function ReviewPanel({ review, loading }: ReviewPanelProps) {
           <div className="prose prose-invert prose-sm max-w-none">
             <ReactMarkdown
               components={{
-                h1: ({ children }) => (
+                h1: ({ children }: { children: React.ReactNode }) => (
                   <h1 className="text-xl font-bold text-zinc-100 mb-4">{children}</h1>
                 ),
-                h2: ({ children }) => (
+                h2: ({ children }: { children: React.ReactNode }) => (
                   <h2 className="text-lg font-semibold text-zinc-200 mb-3 mt-6">{children}</h2>
                 ),
-                h3: ({ children }) => (
+                h3: ({ children }: { children: React.ReactNode }) => (
                   <h3 className="text-base font-medium text-zinc-300 mb-2 mt-4">{children}</h3>
                 ),
-                p: ({ children }) => (
+                p: ({ children }: { children: React.ReactNode }) => (
                   <p className="text-zinc-400 mb-3 leading-relaxed">{children}</p>
                 ),
-                ul: ({ children }) => (
+                ul: ({ children }: { children: React.ReactNode }) => (
                   <ul className="list-disc list-inside space-y-2 text-zinc-400 mb-4">{children}</ul>
                 ),
-                ol: ({ children }) => (
+                ol: ({ children }: { children: React.ReactNode }) => (
                   <ol className="list-decimal list-inside space-y-2 text-zinc-400 mb-4">{children}</ol>
                 ),
-                code: ({ children, className }) => {
+                code: ({ children, className }: { children: React.ReactNode; className?: string }) => {
                   const isBlock = className?.includes('language-');
                   if (isBlock) {
                     return (
@@ -88,7 +88,7 @@ function ReviewPanel({ review, loading }: ReviewPanelProps) {
                     </code>
                   );
                 },
-                strong: ({ children }) => (
+                strong: ({ children }: { children: React.ReactNode }) => (
                   <strong className="text-zinc-200 font-semibold">{children}</strong>
                 ),
               }}

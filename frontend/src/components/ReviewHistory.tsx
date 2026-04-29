@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, Trash2, Eye, Calendar } from 'lucide-react';
+import { Clock, Trash2, Eye } from 'lucide-react';
 import type { ReviewResponse } from '../api';
 
 interface HistoryItem {
@@ -40,7 +40,7 @@ function ReviewHistory({ onLoadReview }: ReviewHistoryProps) {
       review,
     };
 
-    const updated = [item, ...history].slice(0, 20); // Keep last 20
+    const updated = [item, ...history].slice(0, 20);
     setHistory(updated);
     localStorage.setItem('review_history', JSON.stringify(updated));
   };
@@ -78,7 +78,6 @@ function ReviewHistory({ onLoadReview }: ReviewHistoryProps) {
     return lines[0].substring(0, 50) + (lines[0].length > 50 || lines.length > 1 ? '...' : '');
   };
 
-  // Expose saveToHistory function
   useEffect(() => {
     (window as any).saveReviewToHistory = saveToHistory;
   }, [history]);

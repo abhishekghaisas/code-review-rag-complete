@@ -7,8 +7,9 @@ import CodeIngestion from './components/CodeIngestion';
 import ReviewHistory, { type HistoryItem } from './components/ReviewHistory';
 import ComparisonMode from './components/ComparisonMode';
 import ExportReview from './components/ExportReview';
+import { ToastContainer } from './components/Toast';
 import { reviewCode, getModels, getStats, type ReviewResponse, type Model } from './api';
-import { Code2, Sparkles, Database, Upload, Clock, GitCompare } from 'lucide-react';
+import { Code2, Sparkles, Database, Upload, Clock, GitCompare, Save } from 'lucide-react';
 
 const SAMPLE_CODE = `def calculate_total(items):
     total = 0
@@ -17,6 +18,12 @@ const SAMPLE_CODE = `def calculate_total(items):
     return total`;
 
 type TabType = 'review' | 'compare' | 'ingest' | 'history';
+
+interface Toast {
+  id: string;
+  message: string;
+  type?: 'success' | 'error' | 'info';
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('review');
@@ -29,6 +36,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [lastSavedId, setLastSavedId] = useState<number | null>(null);
 
   useEffect(() => {
     loadModels();
@@ -53,6 +62,15 @@ function App() {
     }
   };
 
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Date.now().toString();
+    setToasts((prev) => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const handleReview = async () => {
     if (!code.trim()) {
       setError('Please enter some code to review');
@@ -62,6 +80,7 @@ function App() {
     setLoading(true);
     setError(null);
     setReview(null);
+    setLastSavedId(null);
 
     try {
       const result = await reviewCode({
@@ -73,12 +92,20 @@ function App() {
       });
       setReview(result);
       
-      // Save to history
+      // Show save confirmation
+      if (result.id) {
+        setLastSavedId(result.id);
+        showToast(`Review saved to database (ID: ${result.id})`, 'success');
+      }
+      
+      // Also save to localStorage for history component
       if ((window as any).saveReviewToHistory) {
         (window as any).saveReviewToHistory(code, language, selectedModel, result);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to generate review');
+      const errorMsg = err.response?.data?.detail || 'Failed to generate review';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -90,6 +117,7 @@ function App() {
     setSelectedModel(item.model);
     setReview(item.review);
     setActiveTab('review');
+    showToast('Review loaded from history', 'info');
   };
 
   const tabs = [
@@ -101,6 +129,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -117,16 +148,22 @@ function App() {
               </div>
             </div>
             
-            {stats && (
-              <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center gap-6">
+              {lastSavedId && (
+                <div className="flex items-center gap-2 text-sm bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-1.5">
+                  <Save className="w-4 h-4 text-green-400" />
+                  <span className="text-green-400">Saved (ID: {lastSavedId})</span>
+                </div>
+              )}
+              {stats && (
+                <div className="flex items-center gap-2 text-sm">
                   <Database className="w-4 h-4 text-violet-400" />
                   <span className="text-zinc-400">
                     {stats.total_chunks} chunks indexed
                   </span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -212,7 +249,7 @@ function App() {
                   {loading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      Reviewing...
+                      Reviewing & Saving...
                     </>
                   ) : (
                     <>
@@ -259,7 +296,12 @@ function App() {
         {/* Ingest Tab */}
         {activeTab === 'ingest' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <CodeIngestion onIngestionComplete={loadStats} />
+            <CodeIngestion 
+              onIngestionComplete={() => {
+                loadStats();
+                showToast('Code ingested successfully!', 'success');
+              }} 
+            />
             {stats && <StatsPanel stats={stats} onRefresh={loadStats} />}
           </div>
         )}
