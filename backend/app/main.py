@@ -170,9 +170,17 @@ async def ingest_code_endpoint(request: dict):
 
 
 @app.post("/api/ingest/repo")
-async def ingest_repository(repo_url: str):
+async def ingest_repository(request: dict):
     """Ingest GitHub repository"""
     try:
+        repo_url = request.get("repo_url")
+        
+        if not repo_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="repo_url is required"
+            )
+        
         logger.info(f"Ingesting repo: {repo_url}")
         
         code_files = github_ingestion.ingest_repository(repo_url)
@@ -186,9 +194,12 @@ async def ingest_repository(repo_url: str):
         
         return {
             "status": "success",
-            "files_processed": len(code_files)
+            "files_processed": len(code_files),
+            "message": f"Successfully ingested {len(code_files)} files"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Repo ingest error: {str(e)}")
         raise HTTPException(
