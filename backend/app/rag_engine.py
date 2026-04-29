@@ -1,358 +1,164 @@
 """
-RAG Engine for Code Review
-Combines vector database retrieval with LLM generation for context-aware code reviews.
+Simplified RAG Engine for Code Review - No heavy ML dependencies
+Uses keyword matching instead of semantic embeddings for Railway deployment
 """
 
-import os
-from typing import List, Dict, Optional, Tuple
-from sentence_transformers import SentenceTransformer
-import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
-import logging
-
-from .claude_client import ClaudeClient
-
-logger = logging.getLogger(__name__)
-
+from typing import List, Dict
+import re
+from app.claude_client import ClaudeClient
 
 class CodeReviewRAG:
-    """
-    RAG Engine for code review
+    def __init__(self):
+        self.code_chunks: List[Dict[str, str]] = []
+        self.claude_client = ClaudeClient()
     
-    Workflow:
-    1. Embed code using local sentence-transformers
-    2. Retrieve similar code from ChromaDB
-    3. Build context from retrieved code
-    4. Generate review using OpenRouter LLM
-    """
+    def ingest_code(self, code: str, filename: str = "code.py", language: str = "python"):
+        """Store code chunks for retrieval"""
+        # Simple chunking: split by functions/classes
+        chunks = self._chunk_code(code, language)
+        
+        for i, chunk in enumerate(chunks):
+            self.code_chunks.append({
+                "id": f"{filename}_{i}",
+                "code": chunk,
+                "filename": filename,
+                "language": language
+            })
     
-    def __init__(
-        self,
-        db_path: str = "./data/chroma_db",
-        collection_name: str = "code_chunks",
-        embedding_model: str = "all-MiniLM-L6-v2"
-    ):
-        """
-        Initialize RAG engine
+    def _chunk_code(self, code: str, language: str) -> List[str]:
+        """Simple code chunking without tree-sitter"""
+        lines = code.split('\n')
+        chunks = []
+        current_chunk = []
         
-        Args:
-            db_path: Path to ChromaDB storage
-            collection_name: Name of the collection
-            embedding_model: Sentence transformer model name
-        """
-        logger.info("Initializing Code Review RAG engine...")
+        for line in lines:
+            # Start new chunk on function/class definitions
+            if language == "python":
+                if line.strip().startswith(('def ', 'class ', 'async def ')):
+                    if current_chunk:
+                        chunks.append('\n'.join(current_chunk))
+                    current_chunk = [line]
+                else:
+                    current_chunk.append(line)
+            elif language == "javascript":
+                if re.match(r'^\s*(function|class|const\s+\w+\s*=\s*\()', line):
+                    if current_chunk:
+                        chunks.append('\n'.join(current_chunk))
+                    current_chunk = [line]
+                else:
+                    current_chunk.append(line)
+            else:
+                current_chunk.append(line)
+            
+            # Create chunk every 50 lines
+            if len(current_chunk) >= 50:
+                chunks.append('\n'.join(current_chunk))
+                current_chunk = []
         
-        # Initialize local embeddings (FREE!)
-        self.embedding_model_name = embedding_model
-        logger.info(f"Loading embedding model: {embedding_model}")
-        self.embedder = SentenceTransformer(embedding_model)
-        logger.info(f"Embedding model loaded. Dimension: {self.embedder.get_sentence_embedding_dimension()}")
+        if current_chunk:
+            chunks.append('\n'.join(current_chunk))
         
-        # Initialize ChromaDB (FREE!)
-        logger.info(f"Initializing ChromaDB at: {db_path}")
-        self.chroma_client = chromadb.PersistentClient(
-            path=db_path,
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True
-            )
-        )
-        
-        # Get or create collection
-        self.collection_name = collection_name
-        try:
-            self.collection = self.chroma_client.get_collection(
-                name=collection_name
-            )
-            logger.info(f"Loaded existing collection: {collection_name}")
-            logger.info(f"Collection size: {self.collection.count()} documents")
-        except:
-            self.collection = self.chroma_client.create_collection(
-                name=collection_name,
-                metadata={"hnsw:space": "cosine"}
-            )
-            logger.info(f"Created new collection: {collection_name}")
-        
-        # Initialize Claude client
-        self.llm = ClaudeClient()
-        self.llm_provider = "claude"
-        logger.info("Using Anthropic Claude for LLM")
-        logger.info("RAG engine initialization complete!")
+        return chunks if chunks else [code]
     
-    def ingest_code(
-        self,
-        code_chunks: List[Dict[str, any]]
-    ) -> Dict[str, any]:
-        """
-        Ingest code chunks into vector database
+    def retrieve_relevant_code(self, code_to_review: str, top_k: int = 3) -> List[str]:
+        """Simple keyword-based retrieval"""
+        if not self.code_chunks:
+            return []
         
-        Args:
-            code_chunks: List of dictionaries with structure:
-                [{
-                    "id": "unique_id",
-                    "code": "code content",
-                    "language": "python",
-                    "metadata": {
-                        "file_path": "path/to/file.py",
-                        "function_name": "function_name",
-                        "repo": "repo_name",
-                        ...
-                    }
-                }, ...]
-                
-        Returns:
-            Dictionary with ingestion statistics
-        """
-        if not code_chunks:
-            logger.warning("No code chunks provided for ingestion")
-            return {"status": "error", "message": "No code chunks provided"}
+        # Extract keywords from code to review
+        keywords = self._extract_keywords(code_to_review)
         
-        logger.info(f"Starting ingestion of {len(code_chunks)} code chunks...")
+        # Score chunks by keyword overlap
+        scored_chunks = []
+        for chunk in self.code_chunks:
+            chunk_keywords = self._extract_keywords(chunk["code"])
+            overlap = len(keywords & chunk_keywords)
+            if overlap > 0:
+                scored_chunks.append((overlap, chunk["code"]))
         
-        # Extract components
-        ids = [chunk["id"] for chunk in code_chunks]
-        codes = [chunk["code"] for chunk in code_chunks]
-        metadatas = [chunk.get("metadata", {}) for chunk in code_chunks]
-        
-        # Add language to metadata if not present
-        for i, chunk in enumerate(code_chunks):
-            if "language" not in metadatas[i]:
-                metadatas[i]["language"] = chunk.get("language", "unknown")
-        
-        # Generate embeddings locally (FREE!)
-        logger.info("Generating embeddings...")
-        embeddings = self.embedder.encode(
-            codes,
-            show_progress_bar=True,
-            batch_size=32
-        ).tolist()
-        logger.info(f"Generated {len(embeddings)} embeddings")
-        
-        # Store in ChromaDB
-        logger.info("Storing in vector database...")
-        try:
-            self.collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                documents=codes,
-                metadatas=metadatas
-            )
-            logger.info(f"✅ Successfully ingested {len(code_chunks)} code chunks")
-            
-            return {
-                "status": "success",
-                "chunks_ingested": len(code_chunks),
-                "collection_size": self.collection.count()
-            }
-        except Exception as e:
-            logger.error(f"Error during ingestion: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e)
-            }
+        # Return top K most relevant chunks
+        scored_chunks.sort(reverse=True, key=lambda x: x[0])
+        return [chunk for _, chunk in scored_chunks[:top_k]]
     
-    def retrieve_similar_code(
-        self,
-        query_code: str,
-        n_results: int = 3,
-        language_filter: Optional[str] = None
-    ) -> Tuple[List[str], List[Dict]]:
-        """
-        Retrieve similar code from vector database
+    def _extract_keywords(self, code: str) -> set:
+        """Extract simple keywords from code"""
+        # Remove comments and strings
+        code = re.sub(r'["\'].*?["\']', '', code)
+        code = re.sub(r'#.*$', '', code, flags=re.MULTILINE)
+        code = re.sub(r'//.*$', '', code, flags=re.MULTILINE)
         
-        Args:
-            query_code: Code to find similar examples for
-            n_results: Number of results to return
-            language_filter: Optional language filter
-            
-        Returns:
-            Tuple of (similar_codes, metadatas)
-        """
-        logger.info(f"Retrieving {n_results} similar code chunks...")
+        # Extract identifiers (function names, variable names, etc.)
+        words = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', code)
         
-        # Generate query embedding
-        query_embedding = self.embedder.encode([query_code]).tolist()
-        
-        # Build filter if language specified
-        where_filter = None
-        if language_filter:
-            where_filter = {"language": language_filter}
-        
-        # Query ChromaDB
-        try:
-            results = self.collection.query(
-                query_embeddings=query_embedding,
-                n_results=n_results,
-                where=where_filter
-            )
-            
-            similar_codes = results['documents'][0] if results['documents'] else []
-            metadatas = results['metadatas'][0] if results['metadatas'] else []
-            
-            logger.info(f"Retrieved {len(similar_codes)} similar code chunks")
-            return similar_codes, metadatas
-            
-        except Exception as e:
-            logger.error(f"Error during retrieval: {str(e)}")
-            return [], []
+        # Filter out common keywords
+        stopwords = {'def', 'class', 'import', 'from', 'if', 'else', 'for', 'while', 
+                     'return', 'function', 'const', 'let', 'var', 'async', 'await'}
+        return set(w.lower() for w in words if w.lower() not in stopwords)
     
-    def review_code(
+    async def review_code(
         self,
         code: str,
+        model: str = "claude-haiku-4-5-20251001",
         language: str = "python",
-        model: str = "meta-llama/llama-3.2-3b-instruct:free",
-        use_rag: bool = True,
-        n_similar: int = 3
-    ) -> Dict[str, any]:
-        """
-        End-to-end code review with RAG
+        use_rag: bool = False
+    ) -> dict:
+        """Generate code review using Claude API"""
         
-        Args:
-            code: Code snippet to review
-            language: Programming language
-            model: OpenRouter model to use
-            use_rag: Whether to use RAG retrieval
-            n_similar: Number of similar code examples to retrieve
-            
-        Returns:
-            Dictionary with review, similar code, and metadata
-        """
-        logger.info(f"Starting code review (RAG: {use_rag}, Model: {model})...")
-        
-        # Step 1: Retrieve similar code if RAG is enabled
-        similar_codes = []
-        metadatas = []
+        # Build context from RAG if enabled
         context = ""
+        if use_rag and self.code_chunks:
+            relevant_chunks = self.retrieve_relevant_code(code, top_k=3)
+            if relevant_chunks:
+                context = "\n\n".join([
+                    f"### Related Code Pattern {i+1}:\n```{language}\n{chunk}\n```"
+                    for i, chunk in enumerate(relevant_chunks)
+                ])
         
-        if use_rag and self.collection.count() > 0:
-            similar_codes, metadatas = self.retrieve_similar_code(
-                query_code=code,
-                n_results=n_similar,
-                language_filter=language
-            )
-            
-            # Build context from similar code
-            if similar_codes:
-                context_parts = []
-                for i, (similar_code, metadata) in enumerate(zip(similar_codes, metadatas)):
-                    file_path = metadata.get('file_path', 'unknown')
-                    func_name = metadata.get('function_name', '')
-                    
-                    context_parts.append(
-                        f"Example {i+1} ({file_path}"
-                        f"{' - ' + func_name if func_name else ''}):\n"
-                        f"```{language}\n{similar_code}\n```"
-                    )
-                
-                context = "\n\n".join(context_parts)
-                logger.info(f"Built context from {len(similar_codes)} similar examples")
-        else:
-            if self.collection.count() == 0:
-                logger.info("No code in vector database yet - review without RAG context")
-            else:
-                logger.info("RAG disabled - review without context")
-        
-        # Step 2: Generate review using OpenRouter
+        # Construct the review prompt
+        prompt = f"""You are an expert code reviewer. Analyze the following {language} code and provide:
+
+1. **Overall Assessment** (1-2 sentences)
+2. **Issues Found** (if any):
+   - Security vulnerabilities
+   - Performance problems
+   - Code smells
+   - Bugs
+3. **Suggestions for Improvement**
+4. **Positive Aspects** (what's done well)
+
+{"### Codebase Context:" + chr(10) + context + chr(10) if context else ""}
+
+### Code to Review:
+```{language}
+{code}
+```
+
+Provide a thorough, constructive review."""
+
         try:
-            review = self.llm.review_code(
-                code=code,
-                context=context,
-                language=language,
-                model=model
-            )
+            # Call Claude API
+            review_text = await self.claude_client.generate_review(prompt, model)
             
             return {
-                "review": review,
-                "similar_code": similar_codes,
-                "similar_code_metadata": metadatas,
-                "model_used": model,
+                "review": review_text,
+                "model": model,
+                "language": language,
                 "rag_enabled": use_rag,
-                "context_used": bool(context)
+                "context_used": bool(context),
+                "chunks_retrieved": len(relevant_chunks) if use_rag else 0
             }
-            
+        
         except Exception as e:
-            logger.error(f"Error generating review: {str(e)}")
-            return {
-                "error": str(e),
-                "review": None,
-                "similar_code": similar_codes,
-                "similar_code_metadata": metadatas,
-                "model_used": model,
-                "rag_enabled": use_rag
-            }
+            raise Exception(f"Review generation failed: {str(e)}")
     
-    def get_stats(self) -> Dict[str, any]:
-        """Get statistics about the vector database"""
-        try:
-            count = self.collection.count()
-            return {
-                "collection_name": self.collection_name,
-                "total_chunks": count,
-                "embedding_model": self.embedding_model_name,
-                "embedding_dimension": self.embedder.get_sentence_embedding_dimension()
-            }
-        except Exception as e:
-            logger.error(f"Error getting stats: {str(e)}")
-            return {"error": str(e)}
+    def clear_codebase(self):
+        """Clear all stored code chunks"""
+        self.code_chunks = []
     
-    def reset_database(self):
-        """Reset the vector database (use with caution!)"""
-        logger.warning("Resetting vector database...")
-        self.chroma_client.delete_collection(name=self.collection_name)
-        self.collection = self.chroma_client.create_collection(
-            name=self.collection_name,
-            metadata={"hnsw:space": "cosine"}
-        )
-        logger.info("Database reset complete")
-
-
-# Example usage
-if __name__ == "__main__":
-    # Initialize RAG engine
-    rag = CodeReviewRAG()
-    
-    # Example: Ingest some code
-    sample_chunks = [
-        {
-            "id": "example_1",
-            "code": "def calculate_sum(numbers):\n    return sum(numbers)",
-            "language": "python",
-            "metadata": {
-                "file_path": "utils/math.py",
-                "function_name": "calculate_sum"
-            }
-        },
-        {
-            "id": "example_2",
-            "code": "def get_total(items):\n    total = 0\n    for item in items:\n        total += item\n    return total",
-            "language": "python",
-            "metadata": {
-                "file_path": "helpers/array.py",
-                "function_name": "get_total"
-            }
+    def get_stats(self) -> dict:
+        """Get codebase statistics"""
+        return {
+            "total_chunks": len(self.code_chunks),
+            "files": len(set(chunk["filename"] for chunk in self.code_chunks)),
+            "languages": list(set(chunk["language"] for chunk in self.code_chunks))
         }
-    ]
-    
-    # Ingest
-    result = rag.ingest_code(sample_chunks)
-    print(f"Ingestion result: {result}")
-    
-    # Review code
-    code_to_review = """
-def sum_list(lst):
-    result = 0
-    for i in range(len(lst)):
-        result = result + lst[i]
-    return result
-"""
-    
-    review_result = rag.review_code(
-        code=code_to_review,
-        language="python",
-        model="meta-llama/llama-3.2-3b-instruct:free"
-    )
-    
-    print("\n=== Code Review ===")
-    print(review_result['review'])
-    print(f"\nUsed {len(review_result['similar_code'])} similar examples")
