@@ -3,6 +3,7 @@ FastAPI application for Code Review RAG Assistant - Railway Deployment
 """
 
 import os
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +13,8 @@ import logging
 from app.models import ReviewRequest, ReviewResponse
 from app.rag_engine import CodeReviewRAG
 from app.github_ingestion import GitHubIngestion
+from app.database import init_db, get_db
+from app import crud
 
 # Load environment variables
 load_dotenv()
@@ -55,6 +58,11 @@ async def startup_event():
     logger.info("🚀 Starting Code Review RAG Assistant...")
     
     try:
+        # Initialize database
+        logger.info("Initializing database...")
+        init_db()
+        logger.info("✅ Database initialized")
+        
         # Initialize RAG engine
         rag_engine = CodeReviewRAG()
         logger.info("✅ RAG engine initialized")
@@ -103,6 +111,22 @@ async def review_code_endpoint(request: ReviewRequest):
             language=request.language,
             use_rag=request.use_rag
         )
+        
+        # Save review to database
+        try:
+            db = get_db()
+            crud.create_review(
+                db=db,
+                code=request.code,
+                language=request.language,
+                review=result["review"],
+                model_used=result["model_used"],
+                rag_enabled=result["rag_enabled"]
+            )
+            logger.info("✅ Review saved to database")
+        except Exception as db_error:
+            logger.error(f"Failed to save review: {str(db_error)}")
+            # Don't fail the request if database save fails
         
         return ReviewResponse(**result)
         
@@ -235,6 +259,36 @@ async def get_stats():
     except Exception as e:
         logger.error(f"Stats error: {str(e)}")
         return {"error": str(e)}
+
+
+@app.get("/api/reviews")
+async def get_reviews(skip: int = 0, limit: int = 50):
+    """Get review history"""
+    try:
+        db = get_db()
+        reviews = crud.get_reviews(db, skip=skip, limit=limit)
+        
+        return {
+            "reviews": [
+                {
+                    "id": review.id,
+                    "code": review.code,
+                    "language": review.language,
+                    "review": review.review,
+                    "model_used": review.model_used,
+                    "rag_enabled": review.rag_enabled,
+                    "created_at": review.created_at.isoformat()
+                }
+                for review in reviews
+            ],
+            "total": len(reviews)
+        }
+    except Exception as e:
+        logger.error(f"Error fetching reviews: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @app.delete("/api/reset")
