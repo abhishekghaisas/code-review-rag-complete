@@ -114,7 +114,7 @@ async def review_code_endpoint(request: ReviewRequest):
         
         # Save review to database
         try:
-            db = get_db()
+            db = next(get_db())
             crud.create_review(
                 db=db,
                 code=request.code,
@@ -123,6 +123,7 @@ async def review_code_endpoint(request: ReviewRequest):
                 model_used=result["model_used"],
                 rag_enabled=result["rag_enabled"]
             )
+            db.close()
             logger.info("✅ Review saved to database")
         except Exception as db_error:
             logger.error(f"Failed to save review: {str(db_error)}")
@@ -262,19 +263,19 @@ async def get_stats():
 
 
 @app.get("/api/reviews")
-async def get_reviews(skip: int = 0, limit: int = 50):
+async def get_reviews_endpoint(skip: int = 0, limit: int = 50):
     """Get review history"""
     try:
-        db = get_db()
+        db = next(get_db())
         reviews = crud.get_reviews(db, skip=skip, limit=limit)
         
-        return {
+        result = {
             "reviews": [
                 {
                     "id": review.id,
                     "code": review.code,
                     "language": review.language,
-                    "review": review.review,
+                    "review": review.review_text,
                     "model_used": review.model_used,
                     "rag_enabled": review.rag_enabled,
                     "created_at": review.created_at.isoformat()
@@ -283,6 +284,10 @@ async def get_reviews(skip: int = 0, limit: int = 50):
             ],
             "total": len(reviews)
         }
+        
+        db.close()
+        return result
+        
     except Exception as e:
         logger.error(f"Error fetching reviews: {str(e)}")
         raise HTTPException(
