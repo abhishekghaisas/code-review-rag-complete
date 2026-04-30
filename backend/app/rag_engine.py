@@ -149,7 +149,7 @@ Provide a thorough, constructive review."""
             
             return {
                 "review": review_text,
-                "model": model,
+                "model_used": model,  # Changed from 'model' to 'model_used'
                 "language": language,
                 "rag_enabled": use_rag,
                 "context_used": bool(context),
