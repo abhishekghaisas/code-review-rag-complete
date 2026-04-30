@@ -3,7 +3,7 @@ CRUD operations for database
 """
 
 from sqlalchemy.orm import Session
-from app.database import Review
+from app.database import CodeReview
 from datetime import datetime
 
 
@@ -14,14 +14,17 @@ def create_review(
     review: str,
     model_used: str,
     rag_enabled: bool = False
-) -> Review:
+) -> CodeReview:
     """Create a new review in the database"""
-    db_review = Review(
+    db_review = CodeReview(
         code=code,
         language=language,
-        review=review,
+        model=model_used,  # Store in model field
+        review_text=review,
         model_used=model_used,
         rag_enabled=rag_enabled,
+        use_rag=rag_enabled,
+        context_used=rag_enabled,
         created_at=datetime.utcnow()
     )
     
@@ -32,19 +35,19 @@ def create_review(
     return db_review
 
 
-def get_review(db: Session, review_id: int) -> Review:
+def get_review(db: Session, review_id: int) -> CodeReview:
     """Get a single review by ID"""
-    return db.query(Review).filter(Review.id == review_id).first()
+    return db.query(CodeReview).filter(CodeReview.id == review_id).first()
 
 
-def get_reviews(db: Session, skip: int = 0, limit: int = 50) -> list[Review]:
+def get_reviews(db: Session, skip: int = 0, limit: int = 50) -> list[CodeReview]:
     """Get all reviews with pagination"""
-    return db.query(Review).order_by(Review.created_at.desc()).offset(skip).limit(limit).all()
+    return db.query(CodeReview).order_by(CodeReview.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def delete_review(db: Session, review_id: int) -> bool:
     """Delete a review by ID"""
-    review = db.query(Review).filter(Review.id == review_id).first()
+    review = db.query(CodeReview).filter(CodeReview.id == review_id).first()
     if review:
         db.delete(review)
         db.commit()
@@ -54,7 +57,7 @@ def delete_review(db: Session, review_id: int) -> bool:
 
 def delete_all_reviews(db: Session) -> int:
     """Delete all reviews"""
-    count = db.query(Review).count()
-    db.query(Review).delete()
+    count = db.query(CodeReview).count()
+    db.query(CodeReview).delete()
     db.commit()
     return count
